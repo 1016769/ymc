@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YMC Tracker - Cloudless</title>
+    <style>
+        :root { --primary: #0284c7; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; --danger: #dc2626; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 12px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        /* Header & Stats */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        .dashboard-banner { background: #0f172a; color: white; padding: 15px; border-radius: 10px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 20px; }
+        .stat-box h3 { font-size: 0.7rem; color: #94a3b8; margin: 0; text-transform: uppercase; }
+        .stat-box p { margin: 5px 0 0; font-weight: bold; font-size: 1.1rem; }
+
+        /* Forms */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; background: var(--primary); color: white; }
+        
+        /* Table */
+        .table-wrapper { overflow-x: auto; margin-top: 20px; background: white; border-radius: 10px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; }
+        .delete-btn { color: var(--danger); background: none; width: auto; padding: 4px; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>YMC Tracker</h1>
+        <select id="monthSelect" onchange="renderApp()"></select>
+    </header>
+
+    <div class="dashboard-banner">
+        <div class="stat-box"><h3>Income</h3><p id="statIncome" style="color: #4ed13f;">₱0.00</p></div>
+        <div class="stat-box"><h3>Expenses</h3><p id="statExpense" style="color: #f87171;">₱0.00</p></div>
+        <div class="stat-box"><h3>On Hand</h3><p id="statTotal" style="color: #f59e0b;">₱0.00</p></div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>+ Log Income</h3>
+            <form id="incomeForm">
+                <div class="form-group"><label>Date</label><input type="date" id="incDate" required></div>
+                <div class="form-group"><label>Amount</label><input type="number" id="incAmount" step="0.01" required></div>
+                <div class="form-group">
+                    <label>Source</label>
+                    <select id="incSource">
+                        <option>Allowance</option><option>Offering</option><option>Pledge</option><option>Others</option>
+                    </select>
+                </div>
+                <button type="submit">Save Income</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>- Log Expense</h3>
+            <form id="expenseForm">
+                <div class="form-group"><label>Date</label><input type="date" id="expDate" required></div>
+                <div class="form-group"><label>Amount Taken</label><input type="number" id="expTaken" step="0.01" required></div>
+                <div class="form-group"><label>Change</label><input type="number" id="expChange" step="0.01" required></div>
+                <div class="form-group"><label>Description</label><input type="text" id="expDesc" required></div>
+                <button type="submit" style="background: #334155;">Save Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="ledgerTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    
+    <button onclick="exportData()" style="margin-top: 20px; background: #64748b;">Backup Data (JSON)</button>
+</div>
+
+<script>
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    let db = JSON.parse(localStorage.getItem('ymc_data')) || { records: {}, received: {} };
+
+    // Initialize Month Selector
+    const mSelect = document.getElementById('monthSelect');
+    months.forEach(m => {
+        let opt = document.createElement('option');
+        opt.value = m; opt.innerText = m;
+        if(m === months[new Date().getMonth()]) opt.selected = true;
+        mSelect.appendChild(opt);
+    });
+
+    function save() {
+        localStorage.setItem('ymc_data', JSON.stringify(db));
+        renderApp();
+    }
+
+    function renderApp() {
+        const currentMonth = mSelect.value;
+        const tbody = document.querySelector('#ledgerTable tbody');
+        tbody.innerHTML = '';
+
+        let mIncome = 0, mExpense = 0, totalIncome = 0, totalExpense = 0;
+
+        // Calculate Global Totals & Filter Month View
+        months.forEach(m => {
+            (db.received[m] || []).forEach(item => {
+                totalIncome += parseFloat(item.amount);
+                if(m === currentMonth) {
+                    mIncome += parseFloat(item.amount);
+                    addRow(tbody, item, 'Income', 'color: #16a34a', m);
+                }
+            });
+            (db.records[m] || []).forEach(item => {
+                totalExpense += (parseFloat(item.taken) - parseFloat(item.change));
+                if(m === currentMonth) {
+                    mExpense += (parseFloat(item.taken) - parseFloat(item.change));
+                    addRow(tbody, item, 'Expense', 'color: #dc2626', m);
+                }
+            });
+        });
+
+        document.getElementById('statIncome').innerText = `₱${mIncome.toFixed(2)}`;
+        document.getElementById('statExpense').innerText = `₱${mExpense.toFixed(2)}`;
+        document.getElementById('statTotal').innerText = `₱${(totalIncome - totalExpense).toFixed(2)}`;
+    }
+
+    function addRow(tbody, item, type, style, month) {
+        const row = tbody.insertRow();
+        const amt = type === 'Income' ? item.amount : (item.taken - item.change);
+        row.innerHTML = `
+            <td>${item.date}</td>
+            <td>${type}</td>
+            <td>${item.desc || item.source}</td>
+            <td style="${style}">₱${parseFloat(amt).toFixed(2)}</td>
+            <td><button class="delete-btn" onclick="deleteItem('${month}', '${type}', '${item.id}')">Delete</button></td>
+        `;
+    }
+
+    function deleteItem(month, type, id) {
+        const key = type === 'Income' ? 'received' : 'records';
+        db[key][month] = db[key][month].filter(i => i.id !== id);
+        save();
+    }
+
+    // Form Submissions
+    document.getElementById('incomeForm').onsubmit = (e) => {
+        e.preventDefault();
+        const m = mSelect.value;
+        if(!db.received[m]) db.received[m] = [];
+        db.received[m].push({
+            id: Date.now().toString(),
+            date: document.getElementById('incDate').value,
+            amount: document.getElementById('incAmount').value,
+            source: document.getElementById('incSource').value
+        });
+        e.target.reset();
+        save();
+    };
+
+    document.getElementById('expenseForm').onsubmit = (e) => {
+        e.preventDefault();
+        const m = mSelect.value;
+        if(!db.records[m]) db.records[m] = [];
+        db.records[m].push({
+            id: Date.now().toString(),
+            date: document.getElementById('expDate').value,
+            taken: document.getElementById('expTaken').value,
+            change: document.getElementById('expChange').value,
+            desc: document.getElementById('expDesc').value
+        });
+        e.target.reset();
+        save();
+    };
+
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "ymc_backup.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    renderApp();
+</script>
+</body>
+</html>
