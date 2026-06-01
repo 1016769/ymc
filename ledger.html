@@ -14,7 +14,6 @@
         @media (min-width: 480px) { .btn-back { width: auto; } }
         .btn-back:hover { background: #0369a1; }
         
-        /* Updated Banner: Deep background with white text */
         .running-total-bar { background: linear-gradient(135deg, #0f172a, #1e293b); color: #ffffff; padding: 14px 16px; border-radius: 10px; font-size: 1rem; font-weight: 700; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; }
         .running-total-bar span:first-child { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; color: #94a3b8; }
         
@@ -35,32 +34,24 @@
         .action-cell { white-space: nowrap; text-align: center; }
         .hidden-row-form { display: none; }
 
-        /* 
-           COMPLETE MOBILE BLOCK OVERRIDE (Screens under 768px)
-           This completely dissolves the table so horizontal scrolling is physically impossible.
-        */
+        /* Mobile Layout Shift */
         @media screen and (max-width: 768px) {
             table, thead, tbody, th, td, tr { display: block !important; width: 100% !important; box-sizing: border-box !important; }
-            thead { display: none !important; } /* Hide headers entirely on mobile */
+            thead { display: none !important; }
             
-            /* Turn rows into separate self-contained cards */
             tr { border: 1px solid var(--border) !important; border-radius: 8px !important; margin-bottom: 16px !important; padding: 8px !important; background: #f8fafc !important; box-shadow: 0 1px 3px rgba(0,0,0,0.01); }
-            tr.hidden-row-form { display: none !important; } /* Respect hidden forms */
+            tr.hidden-row-form { display: none !important; }
             
-            /* Format cells to stack vertically with labels on the left side */
             td { border: none !important; border-bottom: 1px dashed #e2e8f0 !important; position: relative !important; padding: 8px 8px 8px 45% !important; text-align: right !important; white-space: normal !important; min-height: 36px !important; }
             td:last-child { border-bottom: none !important; }
             
-            /* Construct floating labels on the left */
             td:before { position: absolute !important; left: 8px !important; top: 8px !important; width: 40% !important; font-weight: 700 !important; color: #475569 !important; font-size: 0.75rem !important; text-transform: uppercase !important; text-align: left !important; white-space: nowrap !important; }
             
-            /* Inflow Labels */
             .inc-table td:nth-of-type(1):before { content: "Date"; }
             .inc-table td:nth-of-type(2):before { content: "Description"; }
             .inc-table td:nth-of-type(3):before { content: "Amount Added"; }
             .inc-table td:nth-of-type(4):before { content: "Actions"; }
             
-            /* Expense Labels */
             .exp-table td:nth-of-type(1):before { content: "Date"; }
             .exp-table td:nth-of-type(2):before { content: "Amt Taken"; }
             .exp-table td:nth-of-type(3):before { content: "Change"; }
@@ -69,7 +60,6 @@
             .exp-table td:nth-of-type(6):before { content: "Responsible"; }
             .exp-table td:nth-of-type(7):before { content: "Actions"; }
 
-            /* Action row balancing */
             td.action-cell { padding-left: 8px !important; text-align: center !important; background: #f1f5f9; border-radius: 4px; margin-top: 4px; }
             td.action-cell:before { content: "" !important; }
             
@@ -94,13 +84,11 @@
     </div>
 
     <div class="ledger-layout">
-        <!-- Inflows Table Section -->
         <div class="card">
             <h2 id="incHeading">Income History</h2>
             <div id="incWrapper"></div>
         </div>
 
-        <!-- Outflows Table Section -->
         <div class="card">
             <h2 id="expHeading">Expenses History</h2>
             <div id="expWrapper"></div>
@@ -220,112 +208,11 @@ function renderOutflows() {
 }
 
 function toggleEdit(id, show) {
-    // Media query fallback check for script safety
     const displayStyle = show ? 'none' : (window.innerWidth <= 768 ? 'block' : 'table-row');
     const editStyle = show ? (window.innerWidth <= 768 ? 'block' : 'table-row') : 'none';
     
     document.getElementById('row-view-' + id).style.display = displayStyle;
     document.getElementById('row-edit-' + id).style.display = editStyle;
-}
-
-function calculateInlineExp(id) {
-    const t = parseFloat(document.getElementById('ex-taken-' + id).value) || 0;
-    const c = parseFloat(document.getElementById('ex-change-' + id).value) || 0;
-    document.getElementById('ex-expDisplay-' + id).value = "₱" + (t - c).toFixed(2);
-}
-
-function saveInflow(id) {
-    const arr = financialData.received[currentViewMonth];
-    const item = arr.find(r => r.id === id);
-    item.date = document.getElementById('ed-date-' + id).value;
-    item.source = document.getElementById('ed-source-' + id).value;
-    item.amount_received = parseFloat(document.getElementById('ed-amt-' + id).value).toFixed(2);
-    
-    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
-    renderLedgerSheets();
-}
-
-function saveOutflow(id) {
-    const arr = financialData.records[currentViewMonth];
-    const item = arr.find(e => e.id === id);
-    const t = parseFloat(document.getElementById('ex-taken-' + id).value) || 0;
-    const c = parseFloat(document.getElementById('ex-change-' + id).value) || 0;
-    
-    item.date = document.getElementById('ex-date-' + id).value;
-    item.amount_taken = t.toFixed(2);
-    item.change = c.toFixed(2);
-    item.expenses = (t - c).toFixed(2);
-    item.description = document.getElementById('ex-desc-' + id).value;
-    item.responsible = document.getElementById('ex-resp-' + id).value;
-
-    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
-    renderLedgerSheets();
-}
-
-function deleteInflow(id) {
-    if(!confirm('Delete this inflow record?')) return;
-    financialData.received[currentViewMonth] = financialData.received[currentViewMonth].filter(r => r.id !== id);
-    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
-    renderLedgerSheets();
-}
-
-function deleteOutflow(id) {
-    if(!confirm('Delete this expense log?')) return;
-    financialData.records[currentViewMonth] = financialData.records[currentViewMonth].filter(e => e.id !== id);
-    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
-    renderLedgerSheets();
-}
-
-window.onload = init;
-</script>
-</body>
-</html>
-
-                <button class="btn-link" onclick="saveInflow('${r.id}')">Save</button>
-                <button class="btn-link danger-text" onclick="toggleEdit('${r.id}', false)">Cancel</button>
-            </td>
-        </tr>`;
-    });
-    wrap.innerHTML = html + `</tbody></table>`;
-}
-
-function renderOutflows() {
-    const wrap = document.getElementById('expWrapper');
-    const logs = financialData.records[currentViewMonth] || [];
-    if(logs.length === 0) { wrap.innerHTML = '<div class="no-data">No expense draws recorded for this month.</div>'; return; }
-
-    let html = `<table class="exp-table"><thead><tr><th>Date</th><th>Amount Taken</th><th>Change</th><th>Actual Expenses</th><th>Description</th><th>Responsible</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
-    logs.forEach(e => {
-        const dStr = new Date(e.date).toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
-        html += `
-        <tr id="row-view-${e.id}">
-            <td>${dStr}</td><td>₱${parseFloat(e.amount_taken).toFixed(2)}</td><td>₱${parseFloat(e.change).toFixed(2)}</td>
-            <td style="font-weight:700; color:#f87171;">₱${parseFloat(e.expenses).toFixed(2)}</td>
-            <td style="font-style:italic; color:#475569;">${e.description}</td><td>${e.responsible}</td>
-            <td class="action-cell">
-                <button class="btn-link" onclick="toggleEdit('${e.id}', true)">Edit</button>
-                <button class="btn-link danger-text" onclick="deleteOutflow('${e.id}')">Delete</button>
-            </td>
-        </tr>
-        <tr id="row-edit-${e.id}" class="hidden-row-form">
-            <td><input type="date" id="ex-date-${e.id}" class="table-control" value="${e.date}"></td>
-            <td><input type="number" step="0.01" id="ex-taken-${e.id}" class="table-control" value="${e.amount_taken}" oninput="calculateInlineExp('${e.id}')"></td>
-            <td><input type="number" step="0.01" id="ex-change-${e.id}" class="table-control" value="${e.change}" oninput="calculateInlineExp('${e.id}')"></td>
-            <td><input type="text" id="ex-expDisplay-${e.id}" class="table-control" style="background:#f1f5f9; font-weight:700;" readonly value="₱${parseFloat(e.expenses).toFixed(2)}"></td>
-            <td><input type="text" id="ex-desc-${e.id}" class="table-control" value="${e.description}"></td>
-            <td><input type="text" id="ex-resp-${e.id}" class="table-control" value="${e.responsible}"></td>
-            <td class="action-cell">
-                <button class="btn-link" onclick="saveOutflow('${e.id}')">Save</button>
-                <button class="btn-link danger-text" onclick="toggleEdit('${e.id}', false)">Cancel</button>
-            </td>
-        </tr>`;
-    });
-    wrap.innerHTML = html + `</tbody></table>`;
-}
-
-function toggleEdit(id, show) {
-    document.getElementById('row-view-' + id).style.display = show ? 'none' : 'table-row';
-    document.getElementById('row-edit-' + id).style.display = show ? 'table-row' : 'none';
 }
 
 function calculateInlineExp(id) {
