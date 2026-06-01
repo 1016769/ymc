@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Ledgers History</title>
+    <style>
+        :root { --primary: #0284c7; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 12px; font-size: 0.95rem; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+        header h1 { margin: 0; font-size: 1.35rem; font-weight: 700; }
+        .btn-back { display: inline-block; text-align: center; text-decoration: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 0.8rem; background: var(--primary); color: white; width: 100%; box-sizing: border-box; }
+        @media (min-width: 480px) { .btn-back { width: auto; } }
+        .btn-back:hover { background: #0369a1; }
+        .running-total-bar { background: #0f172a; color: white; padding: 12px 16px; border-radius: 8px; font-size: 1rem; font-weight: 700; text-align: center; margin-bottom: 16px; border-bottom: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        @media (min-width: 480px) { .running-total-bar { text-align: right; justify-content: flex-end; border-right: 5px solid var(--primary); border-bottom: none; } }
+        .month-nav { padding: 4px 0 16px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+        .month-select { padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 1rem; font-weight: 600; background-color: var(--card); color: var(--text); width: 100%; max-width: 100%; -webkit-appearance: none; }
+        .ledger-layout { display: flex; flex-direction: column; gap: 20px; }
+        .card { background: var(--card); border-radius: 10px; padding: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); border: 1px solid var(--border); }
+        .card h2 { margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid var(--border); padding-bottom: 6px; font-size: 1rem; font-weight: 700; color: #0f172a; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -14px; padding: 0 14px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; white-space: nowrap; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+        th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .no-data { text-align: center; color: #64748b; padding: 24px; font-style: italic; font-size: 0.9rem; }
+        .table-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 16px; width: 100%; box-sizing: border-box; color: var(--text); min-width: 100px; }
+        .btn-link { background: none; border: none; color: var(--primary); font-weight: 700; cursor: pointer; font-size: 0.85rem; padding: 4px 6px; text-decoration: none; display: inline-block; }
+        .btn-link:hover { text-decoration: underline; color: #0369a1; }
+        .btn-link.danger-text { color: #dc2626; }
+        .action-cell { white-space: nowrap; text-align: center; min-width: 110px; }
+        .hidden-row-form { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Financial Dashboard</h1>
+        <a id="lnkBack" href="index.html" class="btn-back">Go to Entry Form</a>
+    </header>
+
+    <div class="running-total-bar">
+        <span>Cash on Hand:</span>
+        <span id="globalCashDisplay" style="color: #f59e0b; font-weight: 800; margin-left: 10px;">₱0.00</span>
+    </div>
+
+    <div class="month-nav">
+        <select class="month-select" id="monthSelector" onchange="changeMonth(this.value)"></select>
+    </div>
+
+    <div class="ledger-layout">
+        <!-- Inflows Table Section -->
+        <div class="card">
+            <h2 id="incHeading">Income History</h2>
+            <div class="table-wrapper" id="incWrapper"></div>
+        </div>
+
+        <!-- Outflows Table Section -->
+        <div class="card">
+            <h2 id="expHeading">Expenses History</h2>
+            <div class="table-wrapper" id="expWrapper"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let financialData = JSON.parse(localStorage.getItem('ymc_financial_db')) || { records: {}, received: {} };
+
+const urlParams = new URLSearchParams(window.location.search);
+let currentViewMonth = urlParams.get('month') || monthsList[new Date().getMonth()];
+
+function init() {
+    const selector = document.getElementById('monthSelector');
+    monthsList.forEach(m => {
+        let opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        if(m === currentViewMonth) opt.selected = true;
+        selector.appendChild(opt);
+    });
+    renderLedgerSheets();
+}
+
+function changeMonth(m) {
+    currentViewMonth = m;
+    window.history.replaceState(null, null, `?month=${encodeURIComponent(m)}`);
+    renderLedgerSheets();
+}
+
+function renderLedgerSheets() {
+    document.getElementById('lnkBack').href = `index.html?month=${encodeURIComponent(currentViewMonth)}`;
+    document.getElementById('incHeading').textContent = `Income History (${currentViewMonth})`;
+    document.getElementById('expHeading').textContent = `Expenses History (${currentViewMonth})`;
+    
+    let globalReceived = 0, globalTaken = 0;
+    monthsList.forEach(m => {
+        if(financialData.received[m]) financialData.received[m].forEach(r => globalReceived += parseFloat(r.amount_received));
+        if(financialData.records[m]) financialData.records[m].forEach(e => globalTaken += (parseFloat(e.amount_taken) - parseFloat(e.change)));
+    });
+    document.getElementById('globalCashDisplay').textContent = `₱${(globalReceived - globalTaken).toFixed(2)}`;
+
+    renderInflows();
+    renderOutflows();
+}
+
+function renderInflows() {
+    const wrap = document.getElementById('incWrapper');
+    const records = financialData.received[currentViewMonth] || [];
+    if(records.length === 0) { wrap.innerHTML = '<div class="no-data">No recorded inflows for this month.</div>'; return; }
+
+    let html = `<table><thead><tr><th>Date</th><th>Source Description</th><th style="text-align: right;">Amount Added</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
+    records.forEach(r => {
+        const dStr = new Date(r.date).toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
+        html += `
+        <tr id="row-view-${r.id}">
+            <td>${dStr}</td><td>${r.source}</td>
+            <td style="text-align: right; font-weight:700; color: #4ed13f;">+₱${parseFloat(r.amount_received).toFixed(2)}</td>
+            <td class="action-cell">
+                <button class="btn-link" onclick="toggleEdit('${r.id}', true)">Edit</button>
+                <button class="btn-link danger-text" onclick="deleteInflow('${r.id}')">Delete</button>
+            </td>
+        </tr>
+        <tr id="row-edit-${r.id}" class="hidden-row-form">
+            <td><input type="date" id="ed-date-${r.id}" class="table-control" value="${r.date}"></td>
+            <td>
+                <select id="ed-source-${r.id}" class="table-control">
+                    <option ${r.source==='Allowance'?'selected':''}>Allowance</option>
+                    <option ${r.source==='Offering'?'selected':''}>Offering</option>
+                    <option ${r.source==='Pledge'?'selected':''}>Pledge</option>
+                    <option ${r.source==='Others'?'selected':''}>Others</option>
+                </select>
+            </td>
+            <td><input type="number" step="0.01" id="ed-amt-${r.id}" class="table-control" style="text-align:right;" value="${r.amount_received}"></td>
+            <td class="action-cell">
+                <button class="btn-link" onclick="saveInflow('${r.id}')">Save</button>
+                <button class="btn-link danger-text" onclick="toggleEdit('${r.id}', false)">Cancel</button>
+            </td>
+        </tr>`;
+    });
+    wrap.innerHTML = html + `</tbody></table>`;
+}
+
+function renderOutflows() {
+    const wrap = document.getElementById('expWrapper');
+    const logs = financialData.records[currentViewMonth] || [];
+    if(logs.length === 0) { wrap.innerHTML = '<div class="no-data">No expense draws recorded for this month.</div>'; return; }
+
+    let html = `<table><thead><tr><th>Date</th><th>Amount Taken</th><th>Change</th><th>Actual Expenses</th><th>Description / Purpose</th><th>Responsible Staff</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
+    logs.forEach(e => {
+        const dStr = new Date(e.date).toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
+        html += `
+        <tr id="row-view-${e.id}">
+            <td>${dStr}</td><td>₱${parseFloat(e.amount_taken).toFixed(2)}</td><td>₱${parseFloat(e.change).toFixed(2)}</td>
+            <td style="font-weight:700; color:#f87171;">₱${parseFloat(e.expenses).toFixed(2)}</td>
+            <td style="font-style:italic; color:#475569; white-space:normal; min-width:150px;">${e.description}</td><td>${e.responsible}</td>
+            <td class="action-cell">
+                <button class="btn-link" onclick="toggleEdit('${e.id}', true)">Edit</button>
+                <button class="btn-link danger-text" onclick="deleteOutflow('${e.id}')">Delete</button>
+            </td>
+        </tr>
+        <tr id="row-edit-${e.id}" class="hidden-row-form">
+            <td><input type="date" id="ex-date-${e.id}" class="table-control" value="${e.date}"></td>
+            <td><input type="number" step="0.01" id="ex-taken-${e.id}" class="table-control" value="${e.amount_taken}" oninput="calculateInlineExp('${e.id}')"></td>
+            <td><input type="number" step="0.01" id="ex-change-${e.id}" class="table-control" value="${e.change}" oninput="calculateInlineExp('${e.id}')"></td>
+            <td><input type="text" id="ex-expDisplay-${e.id}" class="table-control" style="background:#f1f5f9; font-weight:700;" readonly value="₱${parseFloat(e.expenses).toFixed(2)}"></td>
+            <td><input type="text" id="ex-desc-${e.id}" class="table-control" style="min-width:140px;" value="${e.description}"></td>
+            <td><input type="text" id="ex-resp-${e.id}" class="table-control" value="${e.responsible}"></td>
+            <td class="action-cell">
+                <button class="btn-link" onclick="saveOutflow('${e.id}')">Save</button>
+                <button class="btn-link danger-text" onclick="toggleEdit('${e.id}', false)">Cancel</button>
+            </td>
+        </tr>`;
+    });
+    wrap.innerHTML = html + `</tbody></table>`;
+}
+
+function toggleEdit(id, show) {
+    document.getElementById('row-view-' + id).style.display = show ? 'none' : 'table-row';
+    document.getElementById('row-edit-' + id).style.display = show ? 'table-row' : 'none';
+}
+
+function calculateInlineExp(id) {
+    const t = parseFloat(document.getElementById('ex-taken-' + id).value) || 0;
+    const c = parseFloat(document.getElementById('ex-change-' + id).value) || 0;
+    document.getElementById('ex-expDisplay-' + id).value = "₱" + (t - c).toFixed(2);
+}
+
+function saveInflow(id) {
+    const arr = financialData.received[currentViewMonth];
+    const item = arr.find(r => r.id === id);
+    item.date = document.getElementById('ed-date-' + id).value;
+    item.source = document.getElementById('ed-source-' + id).value;
+    item.amount_received = parseFloat(document.getElementById('ed-amt-' + id).value).toFixed(2);
+    
+    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
+    renderLedgerSheets();
+}
+
+function saveOutflow(id) {
+    const arr = financialData.records[currentViewMonth];
+    const item = arr.find(e => e.id === id);
+    const t = parseFloat(document.getElementById('ex-taken-' + id).value) || 0;
+    const c = parseFloat(document.getElementById('ex-change-' + id).value) || 0;
+    
+    item.date = document.getElementById('ex-date-' + id).value;
+    item.amount_taken = t.toFixed(2);
+    item.change = c.toFixed(2);
+    item.expenses = (t - c).toFixed(2);
+    item.description = document.getElementById('ex-desc-' + id).value;
+    item.responsible = document.getElementById('ex-resp-' + id).value;
+
+    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
+    renderLedgerSheets();
+}
+
+function deleteInflow(id) {
+    if(!confirm('Delete this inflow record?')) return;
+    financialData.received[currentViewMonth] = financialData.received[currentViewMonth].filter(r => r.id !== id);
+    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
+    renderLedgerSheets();
+}
+
+function deleteOutflow(id) {
+    if(!confirm('Delete this expense log?')) return;
+    financialData.records[currentViewMonth] = financialData.records[currentViewMonth].filter(e => e.id !== id);
+    localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
+    renderLedgerSheets();
+}
+
+window.onload = init;
+</script>
+</body>
+</html>

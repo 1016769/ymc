@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash Beginning Balance</title>
+    <style>
+        :root { --warning: #0284c7; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --border: #e2e8f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); padding: 40px 20px; margin: 0; }
+        .centered-container { max-width: 500px; margin: 0 auto; }
+        .card { background: var(--card); border-radius: 12px; padding: 30px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid var(--border); border-top: 5px solid var(--warning); }
+        h2 { margin-top: 0; margin-bottom: 8px; font-size: 1.4rem; }
+        p.subtitle { color: #64748b; margin-top: 0; margin-bottom: 25px; font-size: 0.9rem; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; }
+        .form-control { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        .current-display { background: #f0f9ff; border: 1px dashed #bae6fd; font-weight: bold; padding: 12px; border-radius: 6px; font-size: 1.1rem; text-align: center; color: #0369a1; margin-bottom: 20px; }
+        .btn-submit { background: var(--warning); color: white; border: none; width: 100%; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
+        .btn-submit:hover { background: #0369a1; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #475569; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .back-link:hover { color: var(--text); text-decoration: underline; }
+        .readonly-date { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="centered-container">
+    <div class="card">
+        <h2>Cash Beginning Balance</h2>
+        <p class="subtitle">Set the starting cash amount for the year. This adjustment will be logged under <strong>January</strong>.</p>
+        
+        <label style="font-size: 0.8rem; font-weight:600; color:#64748b; text-transform:uppercase;">Current System Balance:</label>
+        <div class="current-display" id="currentGlobalDisplay">₱0.00</div>
+
+        <form id="adjustForm">
+            <div class="form-group">
+                <label>Effective Date (Locked)</label>
+                <input type="text" id="display_date" class="form-control readonly-date" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>New Starting Balance (₱)</label>
+                <input type="number" step="0.01" id="target_cash" class="form-control" required placeholder="Enter starting amount">
+            </div>
+            
+            <button type="submit" class="btn-submit">Update Beginning Balance</button>
+        </form>
+        
+        <a id="lnkCancel" href="index.html" class="back-link">← Cancel & Go Back</a>
+    </div>
+</div>
+
+<script>
+const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let financialData = JSON.parse(localStorage.getItem('ymc_financial_db')) || { records: {}, received: {} };
+
+const urlParams = new URLSearchParams(window.location.search);
+let currentViewMonth = urlParams.get('month') || monthsList[new Date().getMonth()];
+let currentGlobalCash = 0;
+
+function init() {
+    document.getElementById('lnkCancel').href = `index.html?month=${encodeURIComponent(currentViewMonth)}`;
+    
+    const currentYear = new Date().getFullYear();
+    document.getElementById('display_date').value = `January 01, ${currentYear}`;
+    
+    let globalReceived = 0, globalTaken = 0;
+    monthsList.forEach(m => {
+        if(financialData.received[m]) {
+            financialData.received[m].forEach(r => globalReceived += parseFloat(r.amount_received));
+        }
+        if(financialData.records[m]) {
+            financialData.records[m].forEach(e => globalTaken += (parseFloat(e.amount_taken) - parseFloat(e.change)));
+        }
+    });
+    
+    currentGlobalCash = Math.round((globalReceived - globalTaken) * 100) / 100;
+    document.getElementById('currentGlobalDisplay').textContent = `₱${currentGlobalCash.toFixed(2)}`;
+    document.getElementById('target_cash').value = currentGlobalCash.toFixed(2);
+}
+
+document.getElementById('adjustForm').onsubmit = function(e) {
+    e.preventDefault();
+    const targetCash = parseFloat(document.getElementById('target_cash').value);
+    const difference = Math.round((targetCash - currentGlobalCash) * 100) / 100;
+
+    if (difference !== 0) {
+        if (!financialData.received["January"]) financialData.received["January"] = [];
+        
+        const currentYear = new Date().getFullYear();
+        financialData.received["January"].push({
+            id: 'adj_' + Math.random().toString(36).substr(2, 9),
+            date: `${currentYear}-01-01`,
+            amount_received: difference.toFixed(2),
+            source: "Beginning Balance Adjustment"
+        });
+        
+        localStorage.setItem('ymc_financial_db', JSON.stringify(financialData));
+    }
+    
+    window.location.href = `ledger.html?month=January`;
+};
+
+window.onload = init;
+</script>
+</body>
+</html>
