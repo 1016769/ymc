@@ -20,17 +20,48 @@
         .ledger-layout { display: flex; flex-direction: column; gap: 20px; }
         .card { background: var(--card); border-radius: 10px; padding: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); border: 1px solid var(--border); }
         .card h2 { margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid var(--border); padding-bottom: 6px; font-size: 1rem; font-weight: 700; color: #0f172a; }
-        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -14px; padding: 0 14px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; white-space: nowrap; }
+        
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
         th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .no-data { text-align: center; color: #64748b; padding: 24px; font-style: italic; font-size: 0.9rem; }
-        .table-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 16px; width: 100%; box-sizing: border-box; color: var(--text); min-width: 100px; }
+        .table-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 16px; width: 100%; box-sizing: border-box; color: var(--text); }
         .btn-link { background: none; border: none; color: var(--primary); font-weight: 700; cursor: pointer; font-size: 0.85rem; padding: 4px 6px; text-decoration: none; display: inline-block; }
         .btn-link:hover { text-decoration: underline; color: #0369a1; }
         .btn-link.danger-text { color: #dc2626; }
-        .action-cell { white-space: nowrap; text-align: center; min-width: 110px; }
+        .action-cell { white-space: nowrap; text-align: center; }
         .hidden-row-form { display: none; }
+
+        /* Mobile Responsive View Card Layout - Eliminates Horizontal Scrolling */
+        @media screen and (max-width: 600px) {
+            table, inequities, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; padding: 8px; background: #fafafa; }
+            tr.hidden-row-form { display: none; }
+            td { border: none; border-bottom: 1px dashed #e2e8f0; position: relative; padding-left: 45%; text-align: left !important; white-space: normal; min-height: 24px; }
+            td:last-child { border-bottom: none; }
+            td:before { position: absolute; left: 8px; width: 40%; font-weight: 700; color: #475569; font-size: 0.75rem; text-transform: uppercase; }
+            
+            /* Dynamic Labels for Income Rows */
+            .inc-table td:nth-of-type(1):before { content: "Date"; }
+            .inc-table td:nth-of-type(2):before { content: "Description"; }
+            .inc-table td:nth-of-type(3):before { content: "Amount Added"; }
+            .inc-table td:nth-of-type(4):before { content: "Actions"; }
+            
+            /* Dynamic Labels for Expense Rows */
+            .exp-table td:nth-of-type(1):before { content: "Date"; }
+            .exp-table td:nth-of-type(2):before { content: "Amt Taken"; }
+            .exp-table td:nth-of-type(3):before { content: "Change"; }
+            .exp-table td:nth-of-type(4):before { content: "Expenses"; }
+            .exp-table td:nth-of-type(5):before { content: "Description"; }
+            .exp-table td:nth-of-type(6):before { content: "Responsible"; }
+            .exp-table td:nth-of-type(7):before { content: "Actions"; }
+
+            td:before { padding-top: 2px; }
+            td.action-cell { padding-left: 8px; text-align: center !important; }
+            td.action-cell:before { content: "" !important; }
+            .table-control { margin: 4px 0; width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -53,13 +84,13 @@
         <!-- Inflows Table Section -->
         <div class="card">
             <h2 id="incHeading">Income History</h2>
-            <div class="table-wrapper" id="incWrapper"></div>
+            <div id="incWrapper"></div>
         </div>
 
         <!-- Outflows Table Section -->
         <div class="card">
             <h2 id="expHeading">Expenses History</h2>
-            <div class="table-wrapper" id="expWrapper"></div>
+            <div id="expWrapper"></div>
         </div>
     </div>
 </div>
@@ -109,7 +140,7 @@ function renderInflows() {
     const records = financialData.received[currentViewMonth] || [];
     if(records.length === 0) { wrap.innerHTML = '<div class="no-data">No recorded inflows for this month.</div>'; return; }
 
-    let html = `<table><thead><tr><th>Date</th><th>Source Description</th><th style="text-align: right;">Amount Added</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
+    let html = `<table class="inc-table"><thead><tr><th>Date</th><th>Description</th><th style="text-align: right;">Amount Added</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
     records.forEach(r => {
         const dStr = new Date(r.date).toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
         html += `
@@ -146,14 +177,14 @@ function renderOutflows() {
     const logs = financialData.records[currentViewMonth] || [];
     if(logs.length === 0) { wrap.innerHTML = '<div class="no-data">No expense draws recorded for this month.</div>'; return; }
 
-    let html = `<table><thead><tr><th>Date</th><th>Amount Taken</th><th>Change</th><th>Actual Expenses</th><th>Description / Purpose</th><th>Responsible Staff</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
+    let html = `<table class="exp-table"><thead><tr><th>Date</th><th>Amount Taken</th><th>Change</th><th>Actual Expenses</th><th>Description</th><th>Responsible</th><th class="action-cell">Actions</th></tr></thead><tbody>`;
     logs.forEach(e => {
         const dStr = new Date(e.date).toLocaleDateString('en-US', {month:'2-digit', day:'2-digit', year:'numeric'});
         html += `
         <tr id="row-view-${e.id}">
             <td>${dStr}</td><td>₱${parseFloat(e.amount_taken).toFixed(2)}</td><td>₱${parseFloat(e.change).toFixed(2)}</td>
             <td style="font-weight:700; color:#f87171;">₱${parseFloat(e.expenses).toFixed(2)}</td>
-            <td style="font-style:italic; color:#475569; white-space:normal; min-width:150px;">${e.description}</td><td>${e.responsible}</td>
+            <td style="font-style:italic; color:#475569;">${e.description}</td><td>${e.responsible}</td>
             <td class="action-cell">
                 <button class="btn-link" onclick="toggleEdit('${e.id}', true)">Edit</button>
                 <button class="btn-link danger-text" onclick="deleteOutflow('${e.id}')">Delete</button>
@@ -164,7 +195,7 @@ function renderOutflows() {
             <td><input type="number" step="0.01" id="ex-taken-${e.id}" class="table-control" value="${e.amount_taken}" oninput="calculateInlineExp('${e.id}')"></td>
             <td><input type="number" step="0.01" id="ex-change-${e.id}" class="table-control" value="${e.change}" oninput="calculateInlineExp('${e.id}')"></td>
             <td><input type="text" id="ex-expDisplay-${e.id}" class="table-control" style="background:#f1f5f9; font-weight:700;" readonly value="₱${parseFloat(e.expenses).toFixed(2)}"></td>
-            <td><input type="text" id="ex-desc-${e.id}" class="table-control" style="min-width:140px;" value="${e.description}"></td>
+            <td><input type="text" id="ex-desc-${e.id}" class="table-control" value="${e.description}"></td>
             <td><input type="text" id="ex-resp-${e.id}" class="table-control" value="${e.responsible}"></td>
             <td class="action-cell">
                 <button class="btn-link" onclick="saveOutflow('${e.id}')">Save</button>
